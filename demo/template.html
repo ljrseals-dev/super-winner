@@ -1,0 +1,279 @@
+<title>Robot Choir</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* Layout: envelope display and choir seating on top, then source, choir, cues and room controls. Sibling of the Dudley Vocoder and Ten Band EQ. */
+  :root {
+    --bg: #e9eef0; --panel: #f6f9fa; --ink: #13222b; --mute: #55666f; --line: #c3d0d6; --accent: #0a5f86; --accent-ink: #ffffff; --lamp: #b25e00; --trace: #13222b;
+    --f-display: "Barlow Condensed", "Arial Narrow", Impact, sans-serif;
+    --f-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --f-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+    --bg: #0d1519; --panel: #141f25; --ink: #dbe6ea; --mute: #8ea3ac; --line: #28383f; --accent: #f0b447; --accent-ink: #1a1203; --lamp: #f0b447; --trace: #dbe6ea; color-scheme: dark; } }
+  :root[data-theme="dark"] { --bg: #0d1519; --panel: #141f25; --ink: #dbe6ea; --mute: #8ea3ac; --line: #28383f; --accent: #f0b447; --accent-ink: #1a1203; --lamp: #f0b447; --trace: #dbe6ea; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--f-body); padding-block: 20px 48px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+  main { max-width: 980px; margin: 0 auto; display: grid; gap: 16px; }
+  h1 { font: 700 clamp(34px, 7vw, 54px)/0.95 var(--f-display); margin: 0; text-transform: uppercase; text-wrap: balance; }
+  h2 { font: 600 13px/1 var(--f-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--mute); margin: 0 0 12px; }
+  .sub { color: var(--mute); margin: 8px 0 0; max-width: 62ch; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 16px; min-width: 0; }
+  .scope { padding: 0; overflow: hidden; }
+  .scope-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 16px; padding: 12px 16px; border-bottom: 1px solid var(--line); font: 12px var(--f-mono); color: var(--mute); }
+  .scope-head b { color: var(--ink); font-weight: 500; }
+  canvas { display: block; width: 100%; height: 240px; }
+  canvas.pitch { height: 64px; border-top: 1px solid var(--line); }
+  canvas.seat { height: 150px; border-top: 1px solid var(--line); }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  button, select, input[type=file]::file-selector-button { font: 500 14px var(--f-body); border: 1px solid var(--line); background: var(--panel); color: var(--ink); border-radius: 4px; padding: 9px 14px; cursor: pointer; }
+  button:hover, select:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  button[aria-pressed=true] { outline: 2px solid var(--accent); outline-offset: 1px; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 16px 24px; }
+  .ctl { display: grid; gap: 4px; font-size: 13px; color: var(--mute); align-content: start; }
+  .ctl .v { font: 13px var(--f-mono); color: var(--ink); display: flex; justify-content: space-between; gap: 8px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .check { display: flex; gap: 8px; align-items: center; font-size: 14px; color: var(--ink); }
+  .note { font-size: 12.5px; color: var(--mute); }
+  #status { font: 12px var(--f-mono); color: var(--mute); min-height: 18px; }
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .two > div { min-width: 0; }
+  ul.cites { margin: 0; padding-left: 18px; display: grid; gap: 8px; font-size: 14px; }
+  cite { font-style: normal; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<main>
+  <header>
+    <h1>Robot Choir</h1>
+    <p class="sub">One voice goes in. Its band envelopes shape a choir of four to eight drifting saw voices, spread across the stereo field and set in a plate reverb. Speech comes out sung.</p>
+  </header>
+
+  <section class="panel scope" aria-label="Channel envelopes and choir">
+    <div class="scope-head"><span><b id="hdChord">Major</b> &middot; <span id="hdVoices">6 voices</span></span><span id="hdRead">pitch --</span></div>
+    <canvas id="cv" role="img" aria-label="Band envelope display, one row per channel, time to the right"></canvas>
+    <canvas id="cp" class="pitch" role="img" aria-label="Pitch and voicing track of the input"></canvas>
+    <canvas id="cs" class="seat" role="img" aria-label="Choir seating: each voice by stereo position and pitch"></canvas>
+  </section>
+
+  <section class="panel">
+    <h2>Transport</h2>
+    <div class="row">
+      <button id="playV" class="primary">Play choir</button>
+      <button id="playO">Play original</button>
+      <button id="stop">Stop</button>
+      <!--DL--><button id="dl">Save WAV</button><!--/DL-->
+      <span id="status" role="status"></span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Source</h2>
+    <div class="row">
+      <button id="srcDemo" aria-pressed="true">Demo phrase</button>
+      <label class="row" style="gap:8px"><span class="note">Your speech (wav, mp3, m4a, ogg)</span><input id="file" type="file" accept="audio/*"></label>
+      <button id="rec">Record</button>
+    </div>
+    <p class="note" style="margin:10px 0 0">The demo is synthesized vowels and hisses. Real speech works best at 8 seconds or less.</p>
+  </section>
+
+  <section class="panel">
+    <h2>Choir</h2>
+    <div class="grid">
+      <label class="ctl"><span class="v"><span>Voices</span><span id="vVoices">6</span></span><input id="voices" type="range" min="4" max="8" step="1" value="6"></label>
+      <label class="ctl"><span>Chord</span>
+        <select id="chord"><option value="major">Major</option><option value="minor">Minor</option><option value="sus2">Sus2</option><option value="min7">Minor 7th</option><option value="maj9">Major 9th</option><option value="fifths">Open fifths</option><option value="unison">Unison</option></select></label>
+      <label class="ctl"><span>Root</span>
+        <select id="root"><option value="0">C</option><option value="1">C#</option><option value="2">D</option><option value="3">D#</option><option value="4">E</option><option value="5">F</option><option value="6">F#</option><option value="7">G</option><option value="8">G#</option><option value="9">A</option><option value="10">A#</option><option value="11">B</option></select></label>
+      <div class="ctl"><label class="check"><input id="follow" type="checkbox"> Follow the speech melody</label>
+        <span class="note">The speech pitch is snapped to the scale and the chord is planed on top of it.</span></div>
+      <label class="ctl" id="gScale" hidden><span>Scale</span><select id="scale"><option value="major">Major</option><option value="minor">Minor</option></select></label>
+      <label class="ctl"><span class="v"><span>Stereo spread</span><span id="vSpread">0.8</span></span><input id="spread" type="range" min="0" max="1" step="0.05" value="0.8"></label>
+      <label class="ctl"><span class="v"><span>Unison detune</span><span id="vDetune">12 cents</span></span><input id="detune" type="range" min="0" max="40" step="1" value="12"></label>
+      <label class="ctl"><span class="v"><span>Analog drift</span><span id="vDrift">1.0</span></span><input id="drift" type="range" min="0" max="3" step="0.1" value="1"></label>
+      <label class="ctl"><span class="v"><span>Bands</span><span id="vBands">20</span></span><input id="nb" type="range" min="12" max="32" step="1" value="20"></label>
+    </div>
+  </section>
+
+  <section class="panel two">
+    <div>
+      <h2>Uncanny cues</h2>
+      <div class="grid" style="grid-template-columns:1fr;gap:10px">
+        <label class="check"><input id="vib" type="checkbox" checked> Human vibrato, each voice on its own rate</label>
+        <label class="check"><input id="breath" type="checkbox" checked> Breath noise under the voices</label>
+        <label class="check"><input id="cons" type="checkbox" checked> Consonants: hiss and sibilance from the speech</label>
+      </div>
+      <p class="note" style="margin:10px 0 0">Switch these off to hear the machine. Each cue a person makes without knowing is one a synthetic choir lacks.</p>
+    </div>
+    <div>
+      <h2>Room</h2>
+      <div class="grid" style="grid-template-columns:1fr;gap:12px">
+        <label class="ctl"><span class="v"><span>Reverb mix</span><span id="vMix">0.35</span></span><input id="mix" type="range" min="0" max="1" step="0.05" value="0.35"></label>
+        <label class="ctl"><span class="v"><span>Plate decay</span><span id="vDecay">0.62</span></span><input id="decay" type="range" min="0.3" max="0.9" step="0.01" value="0.62"></label>
+      </div>
+      <p class="note" style="margin:10px 0 0">Plate reverb, a Dattorro-style design. Longer decay makes a longer render.</p>
+    </div>
+  </section>
+
+  <section class="panel two">
+    <div>
+      <h2>How it works</h2>
+      <p class="note" style="margin:0 0 8px">Analyzer: the speech passes through a bank of band filters on an ERB scale. Each output is rectified and smoothed into an envelope, as in Dudley's channel vocoder. A tracker supplies pitch and a voiced or unvoiced flag.</p>
+      <p class="note" style="margin:0">Synthesizer: each choir voice is a PolyBLEP saw with its own analog-style drift. Voices are placed left to right, then sum into a left and a right carrier. Each carrier goes through its own copy of the filter bank, with gains set by the same envelopes.</p>
+    </div>
+    <div>
+      <h2>Checked and not checked</h2>
+      <p class="note" style="margin:0 0 8px">Checked by measurement in headless Chromium: more voices make a denser spectrum, spread decorrelates left and right, reverb adds a tail, and the output envelope still follows the speech.</p>
+      <p class="note" style="margin:0">Not checked: how it sounds, whether the words stay intelligible, and whether the cues read as human. The Dattorro plate coefficients were written from memory and not checked against the paper.</p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Sources</h2>
+    <ul class="cites">
+      <li><cite>Dudley, H. (1940). The carrier nature of speech. <i>Bell System Technical Journal</i>, 19(4), 495&ndash;515.</cite> Band analyzer, rectified and smoothed envelopes, buzz and hiss carriers.</li>
+      <li><cite>Dattorro, J. (1997). Effect design, part 1: Reverberator and other filters. <i>Journal of the Audio Engineering Society</i>, 45(9), 660&ndash;684.</cite> Plate reverb topology.</li>
+      <li><cite>Glasberg, B. R. &amp; Moore, B. C. J. (1990). Derivation of auditory filter shapes from notched-noise data. <i>Hearing Research</i>, 47, 103&ndash;138.</cite> ERB-rate scale for the band spacing.</li>
+    </ul>
+    <p class="note" style="margin:12px 0 0">A re-creation from published descriptions. Every control and all output were checked by measurement. I have not heard it.</p>
+  </section>
+</main>
+
+<script type="text/plain" id="wk-drift">
+/*WK_DRIFT*/
+</script>
+<script type="text/plain" id="wk-plate">
+/*WK_PLATE*/
+</script>
+<script>
+/*CORE*/
+</script>
+<script>
+/*ENGINE*/
+</script>
+<script>
+/*CHOIR*/
+</script>
+<script>
+(function () {
+  "use strict";
+  const C = VocoderCore, E = VocoderEngine, K = VocoderChoir;
+  const $ = (id) => document.getElementById(id);
+  const S = { buf: null, pitch: null, out: null, env: null, cfg: null, corr: 0, token: 0, play: null };
+  const NOTE = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  const css = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const status = (t) => { $("status").textContent = t; };
+  K.setWorklets([$("wk-drift").textContent, $("wk-plate").textContent]);
+
+  function cfgNow() {
+    return {
+      voices: +$("voices").value, chord: $("chord").value, rootPc: +$("root").value, follow: $("follow").checked, scale: $("scale").value,
+      spread: +$("spread").value, detune: +$("detune").value, drift: +$("drift").value,
+      vibrato: $("vib").checked, breath: $("breath").checked, consonants: $("cons").checked, sib: 0.4,
+      mix: +$("mix").value, decay: +$("decay").value,
+      bands: C.erbBands(+$("nb").value, 90, 7800), qScale: 1.1, envCut: 40
+    };
+  }
+  function syncUI() {
+    $("gScale").hidden = !$("follow").checked;
+    $("vVoices").textContent = $("voices").value; $("vSpread").textContent = (+$("spread").value).toFixed(2);
+    $("vDetune").textContent = $("detune").value + " cents"; $("vDrift").textContent = (+$("drift").value).toFixed(1);
+    $("vBands").textContent = $("nb").value; $("vMix").textContent = (+$("mix").value).toFixed(2); $("vDecay").textContent = (+$("decay").value).toFixed(2);
+    $("hdChord").textContent = NOTE[+$("root").value] + " " + $("chord").options[$("chord").selectedIndex].text.toLowerCase();
+    $("hdVoices").textContent = $("voices").value + " voices";
+  }
+
+  async function refresh() {
+    if (!S.buf) return;
+    const my = ++S.token, t0 = performance.now(); S.cfg = cfgNow(); syncUI(); status("rendering...");
+    try {
+      const [res, env] = await Promise.all([K.render(S.buf, S.pitch, S.cfg), E.envelopes(S.buf, S.cfg)]);
+      if (my !== S.token) return;
+      S.out = res.buffer; S.env = env; S.corr = res.corr; S.res = res; draw(0);
+      status("rendered " + res.buffer.duration.toFixed(1) + " s in " + Math.round(performance.now() - t0) + " ms, stereo correlation " + res.corr.toFixed(2));
+      window.__ready = (window.__ready || 0) + 1;
+    } catch (e) { status("render failed: " + e.message); console.error(e); }
+  }
+  let timer = 0; const later = () => { clearTimeout(timer); timer = setTimeout(refresh, 260); };
+
+  async function setSource(buf) {
+    S.buf = buf; S.pitch = C.trackPitch(buf.getChannelData(0), buf.sampleRate); const p = S.pitch;
+    $("hdRead").textContent = "pitch median " + Math.round(p.medianF0) + " Hz, voiced " + Math.round(p.voicedShare * 100) + "%";
+    stop(); await refresh();
+  }
+
+  function sizeCanvas(c) { const d = Math.min(2, window.devicePixelRatio || 1), w = Math.round(c.clientWidth * d), h = Math.round(c.clientHeight * d); if (c.width !== w || c.height !== h) { c.width = w; c.height = h; } return d; }
+  function draw(playhead) {
+    const cv = $("cv"), cp = $("cp"), cs = $("cs"), dpr = sizeCanvas(cv); sizeCanvas(cp); sizeCanvas(cs);
+    const panel = css("--panel"), accent = css("--accent"), line = css("--line"), trace = css("--trace"), mute = css("--mute");
+    let g = cv.getContext("2d"); g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = panel; g.fillRect(0, 0, cv.width, cv.height);
+    if (!S.env) return;
+    const { n, frames, data } = S.env, W = cv.width, H = cv.height; let mx = 1e-9; for (let i = 0; i < data.length; i++) if (data[i] > mx) mx = data[i];
+    const cw = W / frames, rh = H / n; g.fillStyle = accent;
+    for (let b = 0; b < n; b++) for (let f = 0; f < frames; f++) { const v = Math.pow(data[f * n + b] / mx, 0.5); if (v < 0.02) continue; g.globalAlpha = Math.min(1, v); g.fillRect(f * cw, H - (b + 1) * rh, Math.ceil(cw) + 0.5, Math.ceil(rh) - 1); }
+    g.globalAlpha = 1;
+    const dur = S.out ? S.out.duration : S.buf.duration, xp = (t) => (t / dur) * W;
+    if (playhead > 0) { g.strokeStyle = trace; g.lineWidth = 2 * dpr; g.beginPath(); g.moveTo(xp(playhead), 0); g.lineTo(xp(playhead), H); g.stroke(); }
+    // input pitch strip
+    g = cp.getContext("2d"); g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = panel; g.fillRect(0, 0, cp.width, cp.height);
+    const p = S.pitch, pw = cp.width, ph = cp.height, lo = 60, hi = 320, y = (f) => ph - ((Math.log(f / lo) / Math.log(hi / lo)) * (ph - 10) + 5);
+    g.strokeStyle = trace; g.lineWidth = 2 * dpr; g.beginPath(); let pen = false;
+    for (let i = 0; i < p.f0.length; i++) { const x = ((i * p.hop) / dur) * pw; if (p.voiced[i]) { if (!pen) { g.moveTo(x, y(p.f0[i])); pen = true; } else g.lineTo(x, y(p.f0[i])); } else pen = false; }
+    g.stroke(); g.fillStyle = mute; g.font = 11 * dpr + "px " + css("--f-mono"); g.fillText("input pitch 60 to 320 Hz", 8 * dpr, 14 * dpr);
+    if (playhead > 0) { g.strokeStyle = accent; g.beginPath(); g.moveTo(xp(playhead), 0); g.lineTo(xp(playhead), ph); g.stroke(); }
+    // choir seating: x = pan, y = pitch
+    g = cs.getContext("2d"); g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = panel; g.fillRect(0, 0, cs.width, cs.height);
+    const R = S.res; if (!R) return; const sw = cs.width, sh = cs.height, ivs = R.intervals, lo2 = Math.min(...ivs) - 3, hi2 = Math.max(...ivs) + 3;
+    g.strokeStyle = line; g.lineWidth = 1; g.beginPath(); g.moveTo(sw / 2, 0); g.lineTo(sw / 2, sh); g.stroke();
+    g.fillStyle = mute; g.fillText("left", 8 * dpr, sh - 6 * dpr); g.fillText("right", sw - 36 * dpr, sh - 6 * dpr); g.fillText("choir seating, height is pitch", sw / 2 + 8 * dpr, 14 * dpr);
+    g.fillStyle = accent;
+    ivs.forEach((iv, i) => { const x = ((R.pans[i] + 1) / 2) * (sw - 60 * dpr) + 30 * dpr, yy = sh - ((iv - lo2) / (hi2 - lo2)) * (sh - 30 * dpr) - 14 * dpr; g.beginPath(); g.arc(x, yy, 7 * dpr, 0, 7); g.fill(); });
+  }
+
+  let ac = null;
+  function stop() { if (S.play) { try { S.play.src.stop(); } catch (e) {} cancelAnimationFrame(S.play.raf); S.play = null; } ["playV", "playO"].forEach((i) => $(i).setAttribute("aria-pressed", "false")); draw(0); }
+  function play(which) {
+    const buf = which === "v" ? S.out : S.buf; if (!buf) return; stop();
+    try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); ac.resume(); } catch (e) { status("Audio is not available here."); return; }
+    const src = ac.createBufferSource(); src.buffer = buf; src.connect(ac.destination); const t0 = ac.currentTime; src.start();
+    const st = { src, raf: 0 }; S.play = st; $(which === "v" ? "playV" : "playO").setAttribute("aria-pressed", "true");
+    const tick = () => { if (S.play !== st) return; const t = ac.currentTime - t0; if (t >= buf.duration) { stop(); return; } draw(t); st.raf = requestAnimationFrame(tick); };
+    src.onended = () => { if (S.play === st) stop(); }; tick();
+  }
+
+  async function decodeFile(ab) {
+    const oc = new OfflineAudioContext(1, 1, E.SR); let b = await oc.decodeAudioData(ab); const max = Math.floor(b.sampleRate * 30);
+    if (b.length > max) { const nb = new AudioBuffer({ length: max, numberOfChannels: b.numberOfChannels, sampleRate: b.sampleRate }); for (let c = 0; c < b.numberOfChannels; c++) nb.copyToChannel(b.getChannelData(c).subarray(0, max), c); b = nb; }
+    return b;
+  }
+  $("srcDemo").onclick = async () => { $("srcDemo").setAttribute("aria-pressed", "true"); await setSource(await E.demo()); };
+  $("file").onchange = async (e) => { const f = e.target.files[0]; if (!f) return; try { status("decoding..."); const b = await decodeFile(await f.arrayBuffer()); $("srcDemo").setAttribute("aria-pressed", "false"); await setSource(b); } catch (err) { status("Could not decode that file. Try wav or mp3."); } };
+  let rec = null;
+  $("rec").onclick = async () => {
+    if (rec) { rec.stop(); return; }
+    try {
+      const st = await navigator.mediaDevices.getUserMedia({ audio: true }), chunks = []; rec = new MediaRecorder(st); rec.ondataavailable = (e) => chunks.push(e.data);
+      rec.onstop = async () => { st.getTracks().forEach((t) => t.stop()); $("rec").textContent = "Record"; rec = null; try { await setSource(await decodeFile(await new Blob(chunks).arrayBuffer())); $("srcDemo").setAttribute("aria-pressed", "false"); } catch (e) { status("Recording could not be decoded."); } };
+      rec.start(); $("rec").textContent = "Stop recording"; status("recording...");
+    } catch (e) { rec = null; status("Microphone is not available in this view. Use the file button instead."); }
+  };
+  $("playV").onclick = () => play("v"); $("playO").onclick = () => play("o"); $("stop").onclick = stop;
+  /*DL*/ if ($("dl")) $("dl").onclick = () => {
+    if (!S.out) return;
+    const url = URL.createObjectURL(new Blob([K.wav2(S.out.getChannelData(0), S.out.getChannelData(1), S.out.sampleRate)], { type: "audio/wav" }));
+    const a = document.createElement("a"); a.href = url; a.download = "robot-choir.wav"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }; /*/DL*/
+  ["voices", "chord", "root", "follow", "scale", "spread", "detune", "drift", "nb", "vib", "breath", "cons", "mix", "decay"].forEach((id) => $(id).addEventListener("input", () => { syncUI(); later(); }));
+  window.addEventListener("resize", () => draw(0));
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => draw(0));
+  new MutationObserver(() => draw(0)).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+  window.__rc = { S, C, E, K, cfgNow, refresh, ready: () => window.__ready || 0 };
+  syncUI();
+  (async () => { await setSource(await E.demo()); })().catch((e) => status("start failed: " + e.message));
+})();
+</script>
