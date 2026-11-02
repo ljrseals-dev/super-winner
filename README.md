@@ -1,3 +1,4 @@
+Copyright © 2026 Lewis James Seals Jr. All rights reserved. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
 # Robot Choir
 
 One speech input drives the band envelopes of a channel vocoder; the carrier is a choir of 4-8 drifting sawtooth voices (chord stacks, per-voice detune and vibrato, stereo spread) set in a plate reverb. Speech comes out sung. No dependencies: open `index.html` (serve over http for AudioWorklet support, e.g. `python3 -m http.server`).
